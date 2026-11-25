@@ -120,15 +120,20 @@ export function routeOf(model: ModelRoute): RouteName {
 }
 
 /**
- * The skills a session offers: the user's own always, the built-in ones only when a built-in agent is
- * offered, since they are written as briefs for the built-in agents.
+ * User skills are always offered. Built-in briefs require a built-in agent unless the skill declares
+ * the data tools it can use directly from the main agent.
  */
-function offeredSkills<S extends { source: string }>(
+function offeredSkills<S extends { source: string; metadata?: Record<string, string> }>(
   agents: readonly { source: string }[],
   skills: readonly S[],
+  available: readonly string[],
 ): S[] {
   const builtInAgent = agents.some((spec) => spec.source === BUILT_IN);
-  return skills.filter((skill) => skill.source !== BUILT_IN || builtInAgent);
+  return skills.filter((skill) => {
+    if (skill.source !== BUILT_IN) return true;
+    const required = skill.metadata?.["required-data-tools"];
+    return required ? matchTools(required.split(/\s+/), available).missing.length === 0 : builtInAgent;
+  });
 }
 
 export function createEngine(settings: EngineSettings): Engine {
@@ -223,7 +228,7 @@ export function createEngine(settings: EngineSettings): Engine {
       ? []
       : [{ ...spec, tools: matched.tools, prompt: withSkills(spec, catalog.skills) }];
   });
-  const skills = offeredSkills(agents, catalog.skills);
+  const skills = offeredSkills(agents, catalog.skills, available);
   return new Engine({
     client,
     route: routeOf(model),

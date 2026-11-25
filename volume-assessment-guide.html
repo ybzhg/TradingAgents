@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TradingAgents · Volume assessment guide</title>
+<style>
+:root{--ink:#152941;--muted:#465d71;--accent:#006357;--line:#d5e1e9;--bg:#eef4f6;--white:#fff}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.6 system-ui,sans-serif}header,main,footer{padding-inline:max(5vw,calc((100% - 1040px)/2))}header{background:#102a3c;color:var(--white);padding-block:2.8rem 2.2rem}header a{color:#b9f0df}header p{color:#d6e8ee;max-width:67ch}h1,h2,h3{line-height:1.13;letter-spacing:-.025em}h1{font-size:clamp(2.25rem,6vw,4.45rem);margin:.15em 0}h2{font-size:1.95rem;margin:0 0 .55em}h3{font-size:1.27rem;margin:1.4em 0 .5em}nav{display:flex;flex-wrap:wrap;gap:.5rem 1.15rem}main{padding-block:1rem}section{background:white;border:1px solid var(--line);border-radius:14px;padding:clamp(1rem,4vw,2.35rem);margin:1rem 0 1.5rem}p{margin:.55rem 0 1rem}li{margin:.45rem 0}a{color:var(--accent);text-underline-offset:.18em}code{font: .88em ui-monospace,SFMono-Regular,monospace;overflow-wrap:anywhere}pre{background:#102a3c;color:white;border-radius:8px;padding:1rem;overflow:auto;line-height:1.5}pre code{overflow-wrap:normal}blockquote{margin:1rem 0;padding:.7rem 1rem;background:#e9f6f1;border-left:4px solid #24786c}.scroll{overflow-x:auto}table{border-collapse:collapse;width:100%;text-align:left}caption{text-align:left;color:var(--muted);margin:.6em 0}th,td{padding:.65rem .75rem;border-bottom:1px solid var(--line);vertical-align:top}thead th{background:#e9f2f5}.path{white-space:nowrap;color:var(--accent);font-size:.9rem;font-weight:700}.seq{min-width:710px}.seq td:first-child{color:var(--accent);font-weight:700}.callout{padding:.8rem 1rem;background:#fff3dc;border-left:4px solid #b47613;margin:1rem 0 0}.summary{display:flex;flex-wrap:wrap;gap:.65rem;margin:1.1rem 0}.summary div{flex:1 1 145px;background:#edf6f3;border-radius:7px;padding:.5rem .8rem}.summary strong{display:block;font-size:1.18rem}.summary span{color:var(--muted);font-size:.87rem}footer{color:var(--muted);font-size:.9rem;padding-bottom:1.5rem}@media print{body,header{background:white;color:var(--ink)}header p,header a{color:var(--ink)}header,main,footer{padding-inline:0}.seq{min-width:0}.path{white-space:normal}tr{break-inside:avoid}nav{display:none}}
+</style>
+</head>
+<body>
+<header>
+<p><code>codex/advanced-volume-assessment</code></p>
+<h1>Volume assessment in TradingAgents</h1>
+<p>How the Advanced Volume v3.1 dashboard became a local compute tool and a reusable research skill for U.S. stocks and ETFs.</p>
+<p><strong>Original source</strong> · <a href="https://www.tradingview.com/script/Q92wni5j-Advanced-Volume-v3-1/">Advanced Volume v3.1 by DarkPoolCrypto on TradingView</a></p>
+<nav aria-label="Report sections"><a href="#use">Run the skill</a><a href="#create">Create the skill</a><a href="#sequence">Sequence diagram</a><a href="#spy">SPY results</a><a href="#verify">Verification</a></nav>
+</header>
+<main>
+<section id="use">
+<h2>Run the skill</h2>
+<p>Launch the feature branch’s executable. The plain <code>tradingagents</code> command on this machine resolves to the separately installed release, which lacked the feature when tested.</p>
+<pre><code>/Users/jzhang/workspace/TradingAgents/dist-bin/tradingagents</code></pre>
+<blockquote>Assess SPY using the volume-assessment skill.</blockquote>
+<p>Replace <code>SPY</code> with another supported U.S. ticker, such as <code>AAPL</code> or <code>SMH</code>. For a one-shot run with machine-readable events, use:</p>
+<pre><code>/Users/jzhang/workspace/TradingAgents/dist-bin/tradingagents \
+  -p "Assess AAPL using the volume-assessment skill." --json</code></pre>
+<p>Configure a model and a daily price-history source. TradingAgents can use Tauric for covered history and fall back to Yahoo on eligible failures. The score uses the returned OHLCV and is calculated in the application. The configured model selects tools and writes the explanation. The two stages can finish at different times.</p>
+<p><a href="docs/usage.md">CLI usage</a> · <a href="docs/models.md">Model configuration</a> · <a href="src/data/routes.ts">Provider routes</a></p>
+</section>
+
+<section id="create">
+<h2>How the skill was created</h2>
+<ol>
+<li><strong>Port the indicator math into TypeScript.</strong> <code>advancedVolumeOf</code> reads chronological OHLCV and calculates CMF(20), close-based MFI(14), volume RSI(14), the 14/28 volume oscillator, RVOL(20), daily-reset estimated CVD, and the daily VWAP proxy. The six named votes and threshold labels follow the pasted Pine logic. The tool also returns an ex-VWAP score and dated divergences. <a href="src/compute/advanced-volume.ts">Compute module</a> · <a href="https://www.tradingview.com/script/Q92wni5j-Advanced-Volume-v3-1/">Published indicator</a></li>
+<li><strong>Wrap the math in a compute tool.</strong> <code>advanced_volume</code> accepts a whole <code>price_history</code> reference, validates daily OHLCV, and writes a structured evidence record with computed provenance and an as-of date. Registration in <code>computeTools()</code> makes it available to the engine. <a href="src/tools/advanced-volume.ts">Tool adapter</a> · <a href="src/tools/catalog.ts">Tool catalog</a></li>
+<li><strong>Write the research workflow as Markdown.</strong> The skill tells the model to fetch one year of history, calculate the volume dashboard, and run the existing trend tool on the same evidence through the dashboard’s date. Two SMA entries accept periods <code>[8,21]</code> and <code>[100,200]</code>. The remaining entries use RSI(14) and MACD(12,26,9). <a href="specs/skills/volume-assessment/SKILL.md">Skill source</a> · <a href="src/tools/indicators.ts">Trend tool</a></li>
+<li><strong>Bundle the skill and declare what it needs.</strong> The built-in catalog embeds the skill. The engine reads its <code>required-data-tools</code> metadata and offers it when <code>price_history</code> is available, including a Yahoo-only setup. Adding a Markdown skill to an older release would still leave that release without the new compute tool. <a href="src/agents/builtin.generated.ts">Built-in catalog</a> · <a href="src/engine/factory.ts">Skill availability</a></li>
+</ol>
+<h3>Skill frontmatter</h3>
+<pre><code>---
+name: volume-assessment
+description: Assess a stock or ETF using the Advanced Volume v3.1 dashboard alongside daily price trend.
+metadata:
+  group: Markets
+  required-data-tools: price_history
+---</code></pre>
+<p>The Markdown body defines the research steps and attribution. The TypeScript tool defines numerical behavior, validation, and evidence. To create another assessment, use a new skill name and declare the history requirement if it can also run from the main agent with pricing alone. Add a compute tool only for calculations the existing tools cannot perform.</p>
+</section>
+
+<section id="sequence">
+<h2>End-to-end sequence diagram</h2>
+<div class="scroll"><table class="seq" aria-label="Sequence diagram for a TradingAgents SPY volume assessment">
+<caption>Read from top to bottom. SPY is the example input. Another supported ticker follows the same flow.</caption>
+<thead><tr><th scope="col">Step</th><th scope="col">Message flow</th><th scope="col">Request or result</th></tr></thead>
+<tbody>
+<tr><td>1</td><td class="path">User → CLI → Engine</td><td>Submit “Assess SPY using the volume-assessment skill.” The engine offers the skill and registered tools to the model.</td></tr>
+<tr><td>2</td><td class="path">Model → Skill catalog → Model</td><td>Load the workflow. The workflow requests one daily OHLCV series and directs both computations to a shared cutoff.</td></tr>
+<tr><td>3</td><td class="path">Model → Registry → Data router</td><td>Request <code>price_history</code> for <code>SPY</code>, interval <code>daily</code>, period <code>1y</code>. The router attempts Tauric first when configured and may try Yahoo on an eligible failure.</td></tr>
+<tr><td>4</td><td class="path">Tauric → Registry → Evidence</td><td>SPY history succeeds on Tauric. The application stores dates, OHLCV, revision states, price basis, and source in a result such as <code>e1</code>.</td></tr>
+<tr><td>5</td><td class="path">Model → Registry → Volume tool</td><td>Pass the whole history reference to <code>advanced_volume</code>. The tool excludes a same-day provisional bar, retains prior sessions flagged as subject to revision, and returns its calculation date, score, votes, and divergence events.</td></tr>
+<tr><td>6</td><td class="path">Model → Registry → Trend tool</td><td>Pass the same history reference and set <code>through</code> to the dashboard date. Compute SMA, RSI, and MACD locally using the requested periods.</td></tr>
+<tr><td>7</td><td class="path">Tools → Evidence → Model</td><td>Record computed results with links to the history input. The model can optionally request bounded evidence slices or precise arithmetic.</td></tr>
+<tr><td>8</td><td class="path">Model → Engine → CLI</td><td>On a completed turn, the model writes the interpretation and the engine resolves citations. In the captured SPY run, Tauric AI credits ran out after computation and before the final write-up.</td></tr>
+</tbody>
+</table></div>
+<p><a href="src/engine/engine.ts">Turn engine</a> · <a href="src/tools/registry.ts">Tool execution</a> · <a href="src/tools/evidence-store.ts">Evidence storage and citations</a></p>
+</section>
+
+<section id="spy">
+<h2>SPY run through Nov. 24, 2026</h2>
+<p>The corrected run fetched one year of Tauric daily history once. It used 250 sessions and split- and dividend-adjusted prices. Both calculations reported the same ending session. The dashboard and trend values below come from the pasted tool output. The local fixture used a separate OHLCV feed.</p>
+<div class="summary">
+<div><span>SPY close</span><strong>$718.78</strong></div>
+<div><span>v3.1 dashboard</span><strong>Neutral (+1)</strong></div>
+<div><span>Without VWAP vote</span><strong>Neutral (0)</strong></div>
+</div>
+<table>
+<thead><tr><th scope="col">Trend metric</th><th scope="col">Visible in the run</th></tr></thead>
+<tbody>
+<tr><th scope="row">SMA 8</th><td>$725.46</td></tr>
+<tr><th scope="row">SMA 100</th><td>$757.87</td></tr>
+<tr><th scope="row">RSI(14)</th><td>40.49</td></tr>
+<tr><th scope="row">MACD(12,26,9) line</th><td>−12.81</td></tr>
+</tbody>
+</table>
+<p>SPY was below the two averages visible in the pasted preview, with RSI below 50 and MACD below zero. The volume label remained neutral. SMA 21 and SMA 200 were requested successfully. Their values are outside the visible preview.</p>
+<div class="callout"><strong>Why the prior run ended Nov. 20</strong><p>The initial version treated every provisional revision flag as an open session. It refetched history twice after excluding Nov. 23 and 24. The revised workflow retains those earlier exchange dates with a revision note and reuses the same evidence for the trend calculation.</p></div>
+<h3>Reading the dashboard</h3>
+<p>The score combines CMF, MFI, volume RSI, the volume oscillator, VWAP position, and volume versus its 20-bar average. Rising volume earns positive points even when the price is falling. RVOL, estimated CVD, and divergence readings provide context alongside the six votes. A single-day session VWAP proxy is the bar’s typical price. With daily CVD resets, the five-bar comparison measures the difference between two individual bars’ estimated deltas. A divergence becomes available on its confirmation date, five bars after the pivot with the implemented defaults. This is a descriptive assessment.</p>
+</section>
+
+<section id="verify">
+<h2>Build and verification</h2>
+<p>From the project directory with dependencies installed, run the test suite and rebuild the workspace CLI after changing TypeScript or the built-in skill catalog.</p>
+<pre><code>bun test
+bun run typecheck
+bun run build
+bun scripts/compile.ts
+./dist-bin/tradingagents --version</code></pre>
+<p>The five unit tests cover the fixed SPY scores, divergence confirmation timing, evidence references and the shared cutoff, invalid history, and built-in skill discovery with Yahoo-only pricing. The workspace executable was rebuilt and verified after local macOS signing. If macOS rejects a freshly compiled local executable because of its signature, run <code>codesign --force --sign - dist-bin/tradingagents</code> on the file you built.</p>
+<p><a href="tests/advanced-volume.test.ts">Unit tests and SPY fixture</a> · <a href="scripts/compile.ts">Executable build script</a> · <a href="tradingagents-architecture.html">Project architecture report</a></p>
+</section>
+</main>
+<footer>Based on the feature-branch source and the supplied SPY runs. The TradingView page documents the indicator. An exact TradingView chart comparison remains unverified.</footer>
+</body>
+</html>

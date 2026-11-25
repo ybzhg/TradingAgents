@@ -94,7 +94,7 @@ function smoothed(values: readonly number[], n: number, alpha: number, seedEnd: 
  * are seeded with the plain mean of the first n changes and then smoothed with alpha 1 / n (Wilder's
  * smoothing), as TA-Lib does; the first value is after n changes.
  */
-function rsi(closes: readonly number[], n: number): Values {
+export function rsi(closes: readonly number[], n: number): Values {
   const out: Values = closes.map(() => null);
   if (closes.length <= n) return out;
   let gain = 0;

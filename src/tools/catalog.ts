@@ -1,8 +1,10 @@
 // Copyright 2026 Tauric Research
 // SPDX-License-Identifier: Apache-2.0
 /** The data tools an agent may be given, each with the capability it reads, and the compute tools. */
+
 import type { Clock } from "../contracts/index.js";
 import type { Capabilities, Capability } from "../data/capabilities.js";
+import { advancedVolumeTool } from "./advanced-volume.js";
 import { calcTool } from "./calc.js";
 import { estimatesTool, ownershipTool, profileTool } from "./company.js";
 import { corporateActionsTool } from "./corporate-actions.js";
@@ -96,6 +98,7 @@ export function computeTools(): Tool[] {
     portfolioRiskTool(),
     optimizePortfolioTool(),
     indicatorsTool(),
+    advancedVolumeTool(),
     dcfTool(),
   ];
 }

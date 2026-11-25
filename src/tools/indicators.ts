@@ -57,6 +57,7 @@ export function indicatorsTool() {
         )
         .min(1)
         .max(INDICATORS.perCall),
+      through: isoDate.optional().describe("Last session to include from the supplied history"),
       from: isoDate
         .optional()
         .describe("The first date the window's facts and crossings cover; values use the whole history"),
@@ -79,7 +80,7 @@ export function indicatorsTool() {
     }),
     label: ({ series, indicators }) =>
       `${labelOf(series)} ${indicators.map((one) => (one.periods ? `${one.name} ${one.periods.join("/")}` : one.name)).join(", ")}`,
-    async run({ series, indicators, from }) {
+    async run({ series, indicators, from, through }) {
       const parsed = BARS.safeParse(series);
       if (!parsed.success) {
         const interval = (series as { interval?: unknown } | null)?.interval;
@@ -97,7 +98,10 @@ export function indicatorsTool() {
       }
       const prepared = fromBars(bars);
       // Sessions without a close are left out with their date, as the other compute tools do.
-      const kept = bars.closes.flatMap((close, i) => (close === null ? [] : [i]));
+      const kept = bars.closes.flatMap((close, i) => {
+        const date = bars.dates[i];
+        return close === null || !date || (through && date > through) ? [] : [i];
+      });
       const dates = kept.map((i) => bars.dates[i] as string);
       const closes = kept.map((i) => bars.closes[i] as number);
       const to = dates.at(-1);

@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TradingAgents · Architecture and query flows</title>
+<style>
+:root{color-scheme:light;--ink:#172944;--muted:#50627a;--line:#d9e2ee;--accent:#135c54;--paper:#fff;--wash:#eef4fa}
+*{box-sizing:border-box}body{margin:0;background:var(--wash);color:var(--ink);font:16px/1.6 system-ui,sans-serif}header,main,footer{padding-inline:max(6vw,calc((100vw - 1080px)/2))}header{background:#142842;color:#fff;padding-top:3.3rem;padding-bottom:2.6rem}header p{color:#d7e6f4;max-width:68ch}header a{color:#c1f4dc}h1,h2,h3{line-height:1.12;letter-spacing:-.025em}h1{font-size:clamp(2.35rem,6vw,4.8rem);margin:.25em 0}h2{font-size:2rem;margin:0 0 .6em}h3{margin:1.5em 0 .5em}.meta{font-size:.85rem;letter-spacing:.06em}nav{display:flex;flex-wrap:wrap;gap:.55rem 1.2rem}main{padding-top:1.2rem;padding-bottom:1.2rem}section{background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:clamp(1rem,4vw,2.25rem);margin:1rem 0 1.5rem}p{margin:.55em 0 1em}a{color:#075b50;text-underline-offset:.2em}code{font: .89em ui-monospace,monospace;overflow-wrap:anywhere}dl{display:grid;grid-template-columns:minmax(10rem,1fr) 3fr;gap:.7rem 1.2rem}dt{font-weight:700}dd{margin:0}.flow{margin:1.3rem 0}.tier{display:flex;gap:.65rem;justify-content:center}.node{flex:1;background:#f0f6fb;border:1px solid var(--line);border-radius:9px;padding:.6rem .8rem;text-align:center}.node strong{display:block}.node small{display:block;color:var(--muted)}.edge{text-align:center;color:var(--accent);font-size:.89rem;font-weight:700;padding:.3rem}.edge span{font-size:1.2rem;margin-right:.35em}.scroll{overflow-x:auto}table{width:100%;border-collapse:collapse;text-align:left}th,td{padding:.68rem .72rem;border-bottom:1px solid var(--line);vertical-align:top}th{background:#edf4f8}tbody th{background:transparent}.seq{min-width:690px}.seq td:first-child{font-weight:700;color:var(--accent);width:3ch}.seq td:nth-child(2){width:31%;font-weight:600}.seq td:nth-child(2) span{color:var(--accent);white-space:nowrap}.callout{background:#edf7f3;border-left:4px solid #27745c;padding:.9rem 1rem;margin:1rem 0}.callout p:last-child{margin-bottom:0}footer{color:var(--muted);padding-bottom:2rem;font-size:.88rem}figcaption{color:var(--muted);margin-top:.85rem;font-size:.9rem}@media(max-width:620px){dl{display:block}dd{margin:0 0 .8rem}.tier{flex-wrap:wrap}.node{min-width:125px}}@media print{body{background:white}header{background:white;color:var(--ink)}header p,header a{color:var(--ink)}header,main,footer{padding-inline:0}section{padding:1rem}.seq{min-width:0}tr,.tier{break-inside:avoid}nav{display:none}}
+</style>
+</head>
+<body>
+<header>
+<p class="meta">REPOSITORY REVIEW · v1.0.1 · 121265d</p>
+<h1>TradingAgents</h1>
+<p>How a terminal question becomes a sourced financial research answer, from the model’s tool calls to provider selection, local calculations, and citations.</p>
+<nav aria-label="Report sections"><a href="#overview">Overview</a><a href="#features">Key features</a><a href="#architecture">Architecture</a><a href="#aapl">Apple sequence</a><a href="#smh">SMH sequence</a><a href="#comparison">Comparison</a></nav>
+</header>
+<main>
+<section id="overview">
+<h2>Overview</h2>
+<p>TradingAgents is a TypeScript financial research CLI with an interactive React/Ink terminal and a headless one-question mode. A configured language model decides what to investigate. The application runs the requested tools, computes quantitative metrics locally, and gives the model bounded results to synthesize into an answer. Its scope is research and reporting.</p>
+<p>The two pasted runs expose the most important architectural distinction. Apple’s company data, pricing, and news came from Tauric. For SMH, the pricing calls reached Yahoo after Tauric reported a coverage gap. Both runs could calculate return and risk statistics because the compute layer consumes the same form of historical series.</p>
+<p><a href="README.md">README</a> · <a href="docs/usage.md">CLI usage</a> · <a href="package.json">Package manifest</a></p>
+</section>
+
+<section id="features">
+<h2>Key features</h2>
+<dl>
+<dt>Interactive and headless</dt><dd>Ask follow-up questions in the terminal or use <code>tradingagents -p "Analyze AAPL" --json</code> to consume turn events as JSON Lines. Auto mode proceeds with research. Plan mode presents a plan for review.</dd>
+<dt>Specialists and skills</dt><dd>Equity, macro, quant, and risk specialists can run with their own context and tool access. Markdown skills provide research procedures. Users can add agents and skills through the catalog.</dd>
+<dt>Model and data configuration</dt><dd>Model providers include Tauric AI, several hosted vendors, OpenAI-compatible endpoints, and ChatGPT sign-in. The model route and data provider routes are configured separately.</dd>
+<dt>Financial data and compute</dt><dd>Tools cover quotes, history, company profiles, analyst estimates, filings, statements, ownership, news, and macro series where supported. Local tools compute returns, beta, correlation, indicators, portfolio statistics, and valuation scenarios.</dd>
+<dt>Evidence and reporting</dt><dd>Structured tool results carry evidence IDs and provenance. Compute tools can reference prior results directly. Answers show numbered sources, and the terminal supports PDF answer export and Markdown transcript export.</dd>
+<dt>Session continuity</dt><dd>Append-only session logs support resuming conversations. Optional Tauric sync applies eligibility rules to evidence payloads. The engine manages cancellation, turn budgets, and context compaction.</dd>
+</dl>
+<p><a href="docs/usage.md">Usage and extensions</a> · <a href="docs/models.md">Model providers</a> · <a href="docs/configuration.md">Configuration</a></p>
+</section>
+
+<section id="architecture">
+<h2>Software architecture</h2>
+<figure class="flow" aria-label="TradingAgents component and data-flow diagram">
+<div class="tier"><div class="node"><strong>Interactive Ink UI</strong><small><a href="src/cli/ChatApp.tsx">ChatApp.tsx</a></small></div><div class="node"><strong>Headless output</strong><small><a href="src/headless/run.ts">headless/run.ts</a></small></div></div>
+<div class="edge"><span>↕</span> Question down · turn events and answer up</div>
+<div class="tier"><div class="node"><strong>CLI bootstrap</strong><small><a href="src/cli/main.tsx">main.tsx</a> · <a href="src/engine/factory.ts">createEngine</a></small></div><div class="node"><strong>Session and turn engine</strong><small><a href="src/engine/session.ts">Session.ask</a> → <a href="src/engine/engine.ts">Engine.ask</a></small></div><div class="node"><strong>Persistence</strong><small>Session → <a href="src/store/log.ts">append-only log</a> · <a href="src/engine/sync.ts">optional sync</a></small></div></div>
+<div class="edge"><span>↕</span> Engine starts agent runs · tool results feed subsequent model steps</div>
+<div class="tier"><div class="node"><strong>Agent loop</strong><small><a href="src/agents/loop.ts">runAgent</a> ↔ <a href="src/models/providers.ts">model adapter</a></small></div><div class="node"><strong>Specialists and skills</strong><small><a href="src/engine/delegation.ts">TurnRuntime</a> · <a href="src/agents/catalog.ts">catalog</a></small></div></div>
+<div class="edge"><span>↕</span> Tool calls, validation, reference resolution, and bounded outputs</div>
+<div class="tier"><div class="node"><strong>Tool registry</strong><small><a href="src/tools/registry.ts">ToolRegistry.execute</a> · <a href="src/tools/catalog.ts">tool catalog</a></small></div><div class="node"><strong>Evidence store</strong><small>Registry ↔ <a href="src/tools/evidence-store.ts">EvidenceStore</a> → engine citations</small></div></div>
+<div class="edge"><span>↕</span> Registry dispatches to data or compute tools</div>
+<div class="tier"><div class="node"><strong>Data tools → router → providers</strong><small><a href="src/data/router.ts">router.ts</a> · <a href="src/data/routes.ts">routes.ts</a> · <a href="src/data/tauric/provider.ts">Tauric</a> · <a href="src/data/yahoo/provider.ts">Yahoo</a> · <a href="src/data/polymarket/provider.ts">Polymarket</a></small></div><div class="node"><strong>Compute tools → local algorithms</strong><small><a href="src/tools/risk.ts">returns_risk adapter</a> → <a href="src/compute/risk.ts">riskOf</a></small></div></div>
+<figcaption>The bootstrap creates and wires the engine at startup. During a turn, the session passes the question to the engine and persists the resulting events and eligible evidence.</figcaption>
+</figure>
+<h3>Key code paths</h3>
+<div class="scroll"><table>
+<thead><tr><th scope="col">Stage</th><th scope="col">Runtime behavior</th></tr></thead>
+<tbody>
+<tr><th scope="row">Startup</th><td><a href="src/cli/main.tsx"><code>main.tsx</code></a> resolves configuration and opens a session. <a href="src/engine/factory.ts"><code>createEngine</code></a> wires the model, provider capabilities, tools, agents, and limits. Yahoo and Polymarket are available without a Tauric key in the default setup.</td></tr>
+<tr><th scope="row">Orchestration</th><td><a href="src/engine/engine.ts"><code>Engine.ask</code></a> manages the turn and evidence scope. <a href="src/agents/loop.ts"><code>runAgent</code></a> alternates streamed model steps with tool execution. Adjacent parallel-safe calls may run concurrently. Delegation is available when specialists have the required data tools.</td></tr>
+<tr><th scope="row">Tool execution</th><td><a href="src/tools/registry.ts"><code>ToolRegistry.execute</code></a> checks the tool allowlist, resolves compute references, validates arguments and output, records evidence, and renders bounded results. Structured failures are returned to the model so it can adjust its research.</td></tr>
+<tr><th scope="row">Data routing</th><td><a href="src/data/routes.ts"><code>ROUTES</code></a> defines provider order by capability. <a href="src/data/router.ts"><code>route</code></a> skips missing implementations and falls through on eligible typed errors. Batch quotes can fill eligible misses from the next provider. <a href="src/data/tauric/transport.ts"><code>failureKind</code></a> maps Tauric’s <code>not_registered</code> to <code>unsupported</code>, which permits a fallback where another provider serves the method. Cancellation and errors such as <code>no_data</code> stop the chain.</td></tr>
+<tr><th scope="row">History and math</th><td><a href="src/tools/price-history.ts"><code>price_history</code></a> emits the series and its price basis and coverage. <a href="src/tools/references.ts"><code>resolveReferences</code></a> supplies that evidence payload to <a href="src/tools/risk.ts"><code>returns_risk</code></a>. The local <a href="src/compute/risk.ts"><code>riskOf</code></a> implementation computes measures including window returns, annualized volatility, peak-to-trough drawdown and recovery, historical VaR, and Sharpe where the inputs support them.</td></tr>
+<tr><th scope="row">Synthesis</th><td>The model writes the narrative with evidence markers. <a href="src/tools/evidence-store.ts"><code>citationsOf</code></a> resolves numbered sources and tracks missing references. Interactive or headless output renders the result and the <a href="src/engine/session.ts">session wrapper</a> commits the turn.</td></tr>
+</tbody>
+</table></div>
+</section>
+
+<section id="aapl">
+<h2>Sequence diagram · Apple (AAPL)</h2>
+<p>Read downward in dependency order. The pasted AAPL answer names the results but omits the individual call events. Independent calls are grouped here because the model can choose their order or issue them together.</p>
+<div class="scroll"><table class="seq" aria-label="AAPL query sequence diagram">
+<thead><tr><th scope="col">Step</th><th scope="col">Message flow</th><th scope="col">Request and result</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>User <span>→</span> Session <span>→</span> Engine</td><td>Submit the Apple question. The engine starts the main agent with session context and tool specs.</td></tr>
+<tr><td>2</td><td>Model <span>→</span> Registry <span>→</span> Router <span>→</span> Tauric</td><td><code>quote(AAPL)</code> requests the quote and <code>price_history(AAPL, 3mo)</code> requests daily bars. Tauric returns both in the pasted run.</td></tr>
+<tr><td>3</td><td>Model <span>→</span> Registry <span>→</span> Tauric</td><td><a href="src/tools/company.ts"><code>profile</code> and <code>estimates</code></a> use the profiles capability. <code>estimates</code> requests analyst and calendar data. <a href="src/tools/news.ts"><code>news</code></a> supplies reporting on market and company developments.</td></tr>
+<tr><td>4</td><td>Tauric <span>→</span> Registry <span>→</span> Evidence store</td><td>Adapters normalize provider responses. The registry records structured results with the source and available freshness metadata, then sends bounded tool output to the model.</td></tr>
+<tr><td>5</td><td>Model <span>→</span> Registry <span>→</span> Local compute</td><td><code>returns_risk</code> references the stored daily history. The registry resolves the input, and the compute tool records a new result with provenance <code>computed</code> and a link to its history input.</td></tr>
+<tr><td>6</td><td>Model <span>→</span> Engine <span>→</span> User</td><td>The answer combines price, fundamentals, estimates, historical risk, and news. The engine resolves cited evidence and the UI displays the answer and sources.</td></tr>
+</tbody></table></div>
+<p><a href="src/tools/quote.ts">Quote tool</a> · <a href="src/tools/price-history.ts">History tool</a> · <a href="src/data/tauric/provider.ts">Tauric adapter</a></p>
+</section>
+
+<section id="smh">
+<h2>Sequence diagram · VanEck Semiconductor ETF (SMH)</h2>
+<p>The follow-up “how about SMH” runs in the same session. The pasted tool activity shows a first group with quote, profile, history, and news, followed by a separate risk calculation.</p>
+<div class="scroll"><table class="seq" aria-label="SMH query sequence diagram">
+<thead><tr><th scope="col">Step</th><th scope="col">Message flow</th><th scope="col">Request and result</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>User <span>→</span> Session <span>→</span> Model</td><td>Submit the follow-up. The previous AAPL turn gives the model the context to apply a similar analysis and compare results.</td></tr>
+<tr><td>2</td><td>Model <span>→</span> Registry <span>→</span> Router <span>→</span> Tauric</td><td><code>quote(SMH)</code> and <code>price_history(SMH, 3mo)</code> start on the Tauric route. Tauric reports that SMH is unregistered in the observed run.</td></tr>
+<tr><td>3</td><td>Tauric <span>→</span> Router <span>→</span> Yahoo</td><td><code>not_registered</code> becomes <code>unsupported</code>. The router tries Yahoo for the eligible pricing calls. The Yahoo adapter normalizes the quote and daily series. The results carry Yahoo provenance and a fallback note.</td></tr>
+<tr><td>4</td><td>Model <span>→</span> Router <span>→</span> Tauric <span>→</span> Model</td><td><code>profile(SMH)</code> returns the coverage error. Profiles has one provider, so the registry reports the failure. In the same group, <code>news</code> searches “SMH VanEck semiconductor ETF holdings” through Tauric’s text-search path and returns articles.</td></tr>
+<tr><td>5</td><td>Model <span>→</span> Registry <span>→</span> Local compute</td><td><code>returns_risk</code> uses the Yahoo history evidence. Its output keeps computed provenance and the history input. The transcript shows the second step returning volatility, drawdown, and Sharpe.</td></tr>
+<tr><td>6</td><td>Model <span>→</span> Engine <span>→</span> User</td><td>The model presents quote and risk data, attributes holdings and beta commentary to articles, and cites prior AAPL risk evidence in the comparison.</td></tr>
+</tbody></table></div>
+<p><a href="src/data/router.ts">Fallback implementation</a> · <a href="src/data/yahoo/provider.ts">Yahoo adapter</a> · <a href="src/tools/news.ts">News and article tools</a></p>
+</section>
+
+<section id="comparison">
+<h2>What the two runs show</h2>
+<div class="scroll"><table>
+<thead><tr><th scope="col">Research input</th><th scope="col">AAPL in the transcript</th><th scope="col">SMH in the transcript</th></tr></thead>
+<tbody>
+<tr><th scope="row">Quote and daily bars</th><td>Tauric</td><td>Yahoo after Tauric coverage failure</td></tr>
+<tr><th scope="row">Profile and estimates</th><td>Tauric profile and analyst/calendar data</td><td>Profile failed. Estimates were absent from the visible calls.</td></tr>
+<tr><th scope="row">News context</th><td>Tauric news supplied company and market context.</td><td>Tauric text search supplied articles used for holdings and beta commentary. The answer also reused earlier market-news evidence.</td></tr>
+<tr><th scope="row">Returns and risk</th><td>Computed from Tauric history</td><td>Computed from Yahoo history using the same local tool</td></tr>
+</tbody></table></div>
+<div class="callout"><p><strong>Price basis and timestamps matter.</strong> Yahoo’s daily series uses split- and dividend-adjusted closes, while its quote uses as-traded prices. The risk tool reports the basis from its history input when available. Both transcript risk windows end Nov 24, while the quotes are dated Nov 25. The AAPL quote shows +0.53% and its news describes an intraday decline. The pasted answer gives insufficient timing detail to reconcile those figures.</p></div>
+<p>The router makes decisions by capability, method, and error kind. The SMH outcome documents coverage in this run. An instrument’s successful pricing response establishes pricing coverage for that call. Company fundamentals and analyst estimates depend on their own Tauric routes.</p>
+</section>
+</main>
+<footer>Based on the local v1.0.1 source at commit <code>121265d</code> and the supplied November 25, 2026 terminal transcript. The sequences reconstruct dependencies from the code and visible results. No fresh provider requests were made.</footer>
+</body>
+</html>
